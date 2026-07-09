@@ -12,6 +12,7 @@ export default function Home() {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [uploadPercent, setUploadPercent] = useState<number | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -21,14 +22,17 @@ export default function Home() {
     }
     setError(null);
     setBusy(true);
+    setUploadPercent(0);
 
     try {
       setStatus("Uploading video...");
       const blob = await upload(file.name, file, {
         access: "public",
         handleUploadUrl: "/api/upload",
+        onUploadProgress: ({ percentage }) => setUploadPercent(percentage),
       });
 
+      setUploadPercent(null);
       setStatus("Creating project...");
       const projectRes = await fetch("/api/projects", {
         method: "POST",
@@ -43,6 +47,7 @@ export default function Home() {
       setError((err as Error).message);
       setBusy(false);
       setStatus(null);
+      setUploadPercent(null);
     }
   }
 
@@ -79,7 +84,20 @@ export default function Home() {
           </div>
 
           {error && <p className="text-sm text-red-500">{error}</p>}
-          {status && <p className="text-sm text-neutral-500">{status}</p>}
+          {status && (
+            <p className="text-sm text-neutral-500">
+              {status}
+              {uploadPercent !== null && ` ${uploadPercent.toFixed(0)}%`}
+            </p>
+          )}
+          {uploadPercent !== null && (
+            <div className="h-1.5 w-full rounded-full bg-neutral-200 dark:bg-neutral-800 overflow-hidden">
+              <div
+                className="h-full bg-neutral-900 dark:bg-white transition-all"
+                style={{ width: `${uploadPercent}%` }}
+              />
+            </div>
+          )}
 
           <button
             type="submit"

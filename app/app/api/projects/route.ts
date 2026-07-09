@@ -2,17 +2,6 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { ensureSchema, sql } from "@/lib/db";
 
-export async function GET() {
-  await ensureSchema();
-  const rows = await sql`
-    SELECT id, name, status, error_message, created_at
-    FROM projects
-    ORDER BY created_at DESC
-    LIMIT 5
-  `;
-  return NextResponse.json(rows);
-}
-
 export async function POST(request: Request) {
   await ensureSchema();
   const { name, videoUrl } = await request.json();
