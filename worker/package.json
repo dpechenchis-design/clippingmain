@@ -1,0 +1,16 @@
+{
+  "name": "clipping-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
+    "@neondatabase/serverless": "^0.10.4",
+    "@vercel/blob": "^2.6.1",
+    "express": "^4.21.2",
+    "openai": "^4.77.0"
+  }
+}

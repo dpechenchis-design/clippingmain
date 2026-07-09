@@ -1,0 +1,29 @@
+# Render Blueprint — deploys the native-ffmpeg worker (worker/) for free.
+# The Next.js site (app/) is deployed separately on Vercel, not here.
+#
+# After connecting this repo on render.com (New → Blueprint), Render reads this
+# file and creates the service. Fill the 5 secret env vars in the dashboard.
+services:
+  - type: web
+    name: clipping-worker
+    runtime: docker
+    rootDir: worker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      # Clip discovery (Claude)
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Whisper transcription (Anthropic has no speech-to-text)
+      - key: OPENAI_API_KEY
+        sync: false
+      # Same Postgres the Vercel app uses (Vercel Storage → Postgres)
+      - key: DATABASE_URL
+        sync: false
+      # Same Vercel Blob token the app uses (Vercel Storage → Blob)
+      - key: BLOB_READ_WRITE_TOKEN
+        sync: false
+      # Must match WORKER_SECRET set in the Vercel app
+      - key: WORKER_SECRET
+        sync: false

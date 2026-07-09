@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+app/node_modules/
+worker/node_modules/
+
+# next.js
+app/.next/
+app/out/
+
+# env files (never commit secrets)
+.env
+.env*.local
+app/.env
+app/.env*.local
+worker/.env
+worker/.env*.local
+
+# vercel
+app/.vercel/
+
+# misc
+.DS_Store
+*.log
+temp/
+clips/

@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ffmpeg *)",
+      "Bash(ffprobe *)",
+      "WebFetch(domain:gist.github.com)",
+      "Bash(pip3 show *)",
+      "Bash(pip3 list *)",
+      "Bash(brew list *)",
+      "Bash(open *)",
+      "Bash(claude mcp *)",
+      "mcp__Vyra__searchHelpDocs",
+      "Bash(git add *)",
+      "Bash(git commit -m 'Add short-form-caption skill for Instagram Reels *)",
+      "Bash(gh repo *)",
+      "Bash(git commit -m 'Update README with cleaner guide and real example *)",
+      "Bash(git push *)",
+      "Bash(ls -la && ls -la \"/Users/dianamakar/Downloads/\" | grep -i \"Tom\")",
+      "Bash(python3 -c ' *)",
+      "Bash(npm -v)",
+      "Bash(npx --yes create-next-app@latest app --typescript --tailwind --eslint --app --no-src-dir --import-alias \"@/*\" --use-npm)",
+      "Bash(npm install *)",
+      "Bash(npm uninstall *)",
+      "Bash(mkdir -p lib app/api/projects app/api/projects/\\\\[id\\\\] app/api/analyze app/api/clips/\\\\[id\\\\]/decision app/api/upload app/project/\\\\[id\\\\] components && ls -la app)",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/next/package.json'\\).version\\)\")",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/@vercel/blob/package.json'\\).version\\)\")",
+      "Bash(npm run *)",
+      "Bash(node --check server.mjs)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "Bash(node -e \"console.log\\('anthropic', require\\('./node_modules/@anthropic-ai/sdk/package.json'\\).version\\)\")",
+      "Bash(openssl rand *)",
+      "Bash(git init *)",
+      "Bash(git -c user.name=clipping -c user.email=dpechenchis@gmail.com commit -q -m 'Clipping app: Next.js site + native-ffmpeg worker *)"
+    ]
+  }
+}
