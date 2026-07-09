@@ -58,7 +58,6 @@ export default function Home() {
         upload(file.name, file, {
           access: "public",
           handleUploadUrl: "/api/upload",
-          multipart: true,
           onUploadProgress: ({ percentage }) => {
             setUploadPercent(percentage);
             const rounded = Math.floor(percentage / 10) * 10;
