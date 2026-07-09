@@ -4,6 +4,24 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s. This usually means a browser extension, VPN, or network is blocking the upload request. Try disabling extensions or using a different network/browser.`));
+    }, ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
 export default function Home() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -13,6 +31,12 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploadPercent, setUploadPercent] = useState<number | null>(null);
+  const [log, setLog] = useState<string[]>([]);
+
+  function addLog(message: string) {
+    const time = new Date().toLocaleTimeString();
+    setLog((prev) => [...prev, `[${time}] ${message}`]);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -23,31 +47,54 @@ export default function Home() {
     setError(null);
     setBusy(true);
     setUploadPercent(0);
+    setLog([]);
+    addLog(`Starting. File: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
 
     try {
       setStatus("Uploading video...");
-      const blob = await upload(file.name, file, {
-        access: "public",
-        handleUploadUrl: "/api/upload",
-        multipart: true,
-        onUploadProgress: ({ percentage }) => setUploadPercent(percentage),
-      });
+      addLog("Calling upload()...");
+      let lastLoggedPercent = -1;
+      const blob = await withTimeout(
+        upload(file.name, file, {
+          access: "public",
+          handleUploadUrl: "/api/upload",
+          multipart: true,
+          onUploadProgress: ({ percentage }) => {
+            setUploadPercent(percentage);
+            const rounded = Math.floor(percentage / 10) * 10;
+            if (rounded !== lastLoggedPercent) {
+              lastLoggedPercent = rounded;
+              addLog(`Upload progress: ${percentage.toFixed(0)}%`);
+            }
+          },
+        }),
+        90_000,
+        "Upload"
+      );
+      addLog(`Upload finished. Blob URL: ${blob.url}`);
 
       setUploadPercent(null);
       setStatus("Creating project...");
-      const projectRes = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name || file.name, videoUrl: blob.url }),
-      });
+      addLog("Creating project record...");
+      const projectRes = await withTimeout(
+        fetch("/api/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: name || file.name, videoUrl: blob.url }),
+        }),
+        20_000,
+        "Create project"
+      );
       if (!projectRes.ok) throw new Error((await projectRes.json()).error || "Failed to create project");
       const { id } = await projectRes.json();
+      addLog(`Project created: ${id}. Redirecting...`);
 
       router.push(`/project/${id}`);
     } catch (err) {
       console.error("Upload failed:", err);
       const message =
         err instanceof Error && err.message ? err.message : "Upload failed. Check the browser console for details.";
+      addLog(`ERROR: ${message}`);
       setError(message);
       setBusy(false);
       setStatus(null);
@@ -110,6 +157,12 @@ export default function Home() {
           >
             {busy ? "Working..." : "Upload & find clips"}
           </button>
+
+          {log.length > 0 && (
+            <pre className="text-xs text-neutral-500 bg-neutral-100 dark:bg-neutral-900 rounded-md p-3 max-h-48 overflow-y-auto whitespace-pre-wrap">
+              {log.join("\n")}
+            </pre>
+          )}
         </form>
       </div>
     </main>
