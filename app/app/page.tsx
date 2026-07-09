@@ -44,7 +44,10 @@ export default function Home() {
 
       router.push(`/project/${id}`);
     } catch (err) {
-      setError((err as Error).message);
+      console.error("Upload failed:", err);
+      const message =
+        err instanceof Error && err.message ? err.message : "Upload failed. Check the browser console for details.";
+      setError(message);
       setBusy(false);
       setStatus(null);
       setUploadPercent(null);
