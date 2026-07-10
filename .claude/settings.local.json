@@ -64,7 +64,12 @@
       "Bash(curl -s https://clippingmain.vercel.app/api/blob-test --max-time 15)",
       "Bash(vercel inspect *)",
       "Bash(echo \"diagnostic test content\" > /tmp/blob_cli_test.txt *)",
-      "Bash(BLOB_READ_WRITE_TOKEN=vercel_blob_rw_ayP0QuIE5Ep5fAYd_QBE9TjHjlKkBlATKJJ4bcexyIjGcsL vercel blob put /tmp/blob_cli_test.txt --add-random-suffix true)"
+      "Bash(BLOB_READ_WRITE_TOKEN=vercel_blob_rw_ayP0QuIE5Ep5fAYd_QBE9TjHjlKkBlATKJJ4bcexyIjGcsL vercel blob put /tmp/blob_cli_test.txt --add-random-suffix true)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://clippingmain.vercel.app/ --max-time 15)",
+      "Bash(curl -s -w '\\\\nHTTP %{http_code}\\\\n' -X POST https://clippingmain.vercel.app/api/upload -H 'Content-Type: application/json' -d '{\"type\":\"blob.generate-client-token\",\"payload\":{\"pathname\":\"test.mp4\",\"multipart\":false,\"clientPayload\":null}}' --max-time 20)",
+      "Bash(cp /tmp/blob_upload_test.mjs /Users/dianamakar/Downloads/clipping/app/blob_upload_test.mjs)",
+      "Bash(node blob_upload_test.mjs)",
+      "Bash(rm -f blob_upload_test.mjs)"
     ]
   }
 }

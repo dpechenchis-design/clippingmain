@@ -2,25 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { upload } from "@vercel/blob/client";
 
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s. This usually means a browser extension, VPN, or network is blocking the upload request. Try disabling extensions or using a different network/browser.`));
-    }, ms);
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (err) => {
-        clearTimeout(timer);
-        reject(err);
-      }
-    );
-  });
-}
+const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL;
 
 export default function Home() {
   const router = useRouter();
@@ -44,6 +27,10 @@ export default function Home() {
       setError("Choose a video file first.");
       return;
     }
+    if (!WORKER_URL) {
+      setError("Worker URL is not configured (NEXT_PUBLIC_WORKER_URL missing).");
+      return;
+    }
     setError(null);
     setBusy(true);
     setUploadPercent(0);
@@ -52,42 +39,49 @@ export default function Home() {
 
     try {
       setStatus("Uploading video...");
-      addLog("Calling upload()...");
-      let lastLoggedPercent = -1;
-      const blob = await withTimeout(
-        upload(file.name, file, {
-          access: "public",
-          handleUploadUrl: "/api/upload",
-          onUploadProgress: ({ percentage }) => {
-            setUploadPercent(percentage);
-            const rounded = Math.floor(percentage / 10) * 10;
-            if (rounded !== lastLoggedPercent) {
-              lastLoggedPercent = rounded;
-              addLog(`Upload progress: ${percentage.toFixed(0)}%`);
+      const formData = new FormData();
+      formData.append("name", name || file.name);
+      formData.append("video", file);
+
+      const { id } = await new Promise<{ id: string }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        let lastLoggedPercent = -1;
+
+        xhr.upload.addEventListener("progress", (e) => {
+          if (!e.lengthComputable) return;
+          const percentage = (e.loaded / e.total) * 100;
+          setUploadPercent(percentage);
+          const rounded = Math.floor(percentage / 10) * 10;
+          if (rounded !== lastLoggedPercent) {
+            lastLoggedPercent = rounded;
+            addLog(`Upload progress: ${percentage.toFixed(0)}%`);
+          }
+        });
+
+        xhr.addEventListener("load", () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch {
+              reject(new Error("Worker returned an invalid response."));
             }
-          },
-        }),
-        90_000,
-        "Upload"
-      );
-      addLog(`Upload finished. Blob URL: ${blob.url}`);
+          } else {
+            try {
+              reject(new Error(JSON.parse(xhr.responseText).error || `Upload failed (${xhr.status})`));
+            } catch {
+              reject(new Error(`Upload failed (${xhr.status})`));
+            }
+          }
+        });
 
-      setUploadPercent(null);
-      setStatus("Creating project...");
-      addLog("Creating project record...");
-      const projectRes = await withTimeout(
-        fetch("/api/projects", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: name || file.name, videoUrl: blob.url }),
-        }),
-        20_000,
-        "Create project"
-      );
-      if (!projectRes.ok) throw new Error((await projectRes.json()).error || "Failed to create project");
-      const { id } = await projectRes.json();
+        xhr.addEventListener("error", () => reject(new Error("Network error while uploading to the worker.")));
+        xhr.addEventListener("abort", () => reject(new Error("Upload was aborted.")));
+
+        xhr.open("POST", `${WORKER_URL.replace(/\/$/, "")}/upload`);
+        xhr.send(formData);
+      });
+
       addLog(`Project created: ${id}. Redirecting...`);
-
       router.push(`/project/${id}`);
     } catch (err) {
       console.error("Upload failed:", err);

@@ -1,4 +1,6 @@
 import express from "express";
+import cors from "cors";
+import multer from "multer";
 import { spawn } from "node:child_process";
 import { mkdtemp, rm, readFile, writeFile, readdir } from "node:fs/promises";
 import { createReadStream } from "node:fs";
@@ -342,10 +344,32 @@ async function runCut(clipId) {
 // ---------------------------------------------------------------------------
 
 const app = express();
+app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 
+const ALLOWED_VIDEO_TYPES = new Set([
+  "video/mp4",
+  "video/quicktime",
+  "video/x-m4v",
+  "video/webm",
+]);
+
+// Videos are streamed to a temp file on disk (never buffered in memory) so a
+// 5GB upload doesn't blow the worker's RAM.
+const upload = multer({
+  dest: join(tmpdir(), "clip-uploads"),
+  limits: { fileSize: 5 * 1024 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    cb(null, ALLOWED_VIDEO_TYPES.has(file.mimetype));
+  },
+});
+
 app.use((req, res, next) => {
-  if (req.path === "/health") return next();
+  // Public, unauthenticated: the browser uploads video bytes directly here
+  // (this replaces the Vercel Blob client-upload flow, which kept failing
+  // with delegated-token errors on this project's store). /analyze and /cut
+  // stay behind WORKER_SECRET since only our own Vercel app calls those.
+  if (req.path === "/health" || req.path === "/upload") return next();
   const auth = req.headers.authorization || "";
   if (auth !== `Bearer ${WORKER_SECRET}`) {
     return res.status(401).json({ error: "unauthorized" });
@@ -354,6 +378,39 @@ app.use((req, res, next) => {
 });
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
+
+// Browser uploads the raw video file here (multipart/form-data: name, video).
+// We stream it straight to Vercel Blob using the worker's own read-write
+// token (server-to-server -- the one auth path that's actually reliable)
+// and create the project row, mirroring what the old client-upload +
+// POST /api/projects flow used to do.
+app.post("/upload", upload.single("video"), async (req, res) => {
+  const file = req.file;
+  const name = (req.body?.name || "").trim();
+  if (!file) return res.status(400).json({ error: "video file is required" });
+
+  try {
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(-80) || "video.mp4";
+    const blob = await put(`videos/${randomUUID()}_${safeName}`, createReadStream(file.path), {
+      access: "public",
+      contentType: file.mimetype,
+      token: BLOB_READ_WRITE_TOKEN,
+    });
+
+    const id = randomUUID();
+    await sql`
+      INSERT INTO projects (id, name, video_url, status)
+      VALUES (${id}, ${name || file.originalname}, ${blob.url}, 'uploaded')
+    `;
+
+    res.json({ id });
+  } catch (err) {
+    console.error("upload failed", err);
+    res.status(500).json({ error: String(err.message || err) });
+  } finally {
+    await rm(file.path, { force: true });
+  }
+});
 
 // Fire-and-forget: accept immediately, process in the background, write results
 // to the DB. The web app polls the project/clip rows for progress.

@@ -1,8 +1,16 @@
 # Clipping worker
 
-Native-ffmpeg background worker for the Clipping web app. Handles the two heavy
+Native-ffmpeg background worker for the Clipping web app. Handles the heavy
 jobs that don't fit on Vercel serverless / in-browser wasm:
 
+- **Upload** — the browser sends the raw video file here directly
+  (`multipart/form-data`, streamed to disk, never buffered in memory). The
+  worker uploads it to Vercel Blob using its own read-write token and creates
+  the project row. This replaced Vercel Blob's client-upload flow (browser →
+  Blob directly via a delegated token), which reliably failed with
+  `Access denied` / `Token mismatch` errors on this project's store even
+  though the same token worked fine for plain server-to-server uploads —
+  routing through the worker sidesteps that entirely.
 - **Transcription** — extracts compressed mono audio from the source video,
   splits it into ≤10-min chunks, runs each through Whisper, and stitches the
   timecoded segments back together. Works for multi-hour, multi-GB videos (the
@@ -25,9 +33,13 @@ connections, so nothing can time out.
 
 ## Endpoints
 
-All except `/health` require `Authorization: Bearer $WORKER_SECRET`.
+`/health` and `/upload` are public (the browser calls `/upload` directly, with
+no way to hand it a secret). Everything else requires
+`Authorization: Bearer $WORKER_SECRET` — only the Vercel app calls those.
 
 - `GET  /health` → `{ ok: true }`
+- `POST /upload` `multipart/form-data: name, video` → uploads to Blob, creates
+  the project row, returns `{ id }`
 - `POST /analyze` `{ projectId }` → transcribe (if needed) + find clip candidates
 - `POST /cut` `{ clipId }` → cut + upload, sets `clips.result_url`
 
